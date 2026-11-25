@@ -1,0 +1,144 @@
+name: Сборка QRDrop (Android, Windows, macOS, Linux)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Android (.apk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Генерация Android-платформы и разрешений сети
+        run: |
+          cp -r lib /tmp/qrdrop_lib
+          cp pubspec.yaml /tmp/qrdrop_pubspec.yaml
+          flutter create --platforms=android --project-name qrdrop --org com.qrdrop .
+          rm -rf lib && mv /tmp/qrdrop_lib lib
+          mv /tmp/qrdrop_pubspec.yaml pubspec.yaml
+          python3 - << 'EOF'
+          p = "android/app/src/main/AndroidManifest.xml"
+          txt = open(p, encoding="utf-8").read()
+          perms = (
+              '    <uses-permission android:name="android.permission.INTERNET"/>\n'
+              '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n'
+              '    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>\n'
+          )
+          if "android.permission.INTERNET" not in txt:
+              txt = txt.replace("<application", perms + "    <application", 1)
+          if "usesCleartextTraffic" not in txt:
+              txt = txt.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+          open(p, "w", encoding="utf-8").write(txt)
+          EOF
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QRDrop-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Генерация Windows-платформы
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse lib $env:TEMP\qrdrop_lib
+          Copy-Item pubspec.yaml $env:TEMP\qrdrop_pubspec.yaml
+          flutter create --platforms=windows --project-name qrdrop --org com.qrdrop .
+          Remove-Item -Recurse -Force lib
+          Move-Item $env:TEMP\qrdrop_lib lib
+          Move-Item -Force $env:TEMP\qrdrop_pubspec.yaml pubspec.yaml
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - name: Упаковка в ZIP
+        shell: pwsh
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath QRDrop-Windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QRDrop-Windows-x64
+          path: QRDrop-Windows-x64.zip
+
+  build-macos:
+    name: macOS (.app)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Генерация macOS-платформы и прав сети/файлов
+        run: |
+          cp -r lib /tmp/qrdrop_lib
+          cp pubspec.yaml /tmp/qrdrop_pubspec.yaml
+          flutter create --platforms=macos --project-name qrdrop --org com.qrdrop .
+          rm -rf lib && mv /tmp/qrdrop_lib lib
+          mv /tmp/qrdrop_pubspec.yaml pubspec.yaml
+          python3 - << 'EOF'
+          entitlements = """\t<key>com.apple.security.network.server</key>
+          \t<true/>
+          \t<key>com.apple.security.network.client</key>
+          \t<true/>
+          \t<key>com.apple.security.files.user-selected.read-write</key>
+          \t<true/>
+          """
+          for p in ("macos/Runner/Release.entitlements", "macos/Runner/DebugProfile.entitlements"):
+              txt = open(p, encoding="utf-8").read()
+              if "com.apple.security.network.server" not in txt:
+                  txt = txt.replace("</dict>", entitlements + "</dict>", 1)
+                  open(p, "w", encoding="utf-8").write(txt)
+          EOF
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - name: Упаковка .app в ZIP
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r "$GITHUB_WORKSPACE/QRDrop-macOS.zip" qrdrop.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QRDrop-macOS
+          path: QRDrop-macOS.zip
+
+  build-linux:
+    name: Linux (x64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Установка системных библиотек GTK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Генерация Linux-платформы
+        run: |
+          cp -r lib /tmp/qrdrop_lib
+          cp pubspec.yaml /tmp/qrdrop_pubspec.yaml
+          flutter create --platforms=linux --project-name qrdrop --org com.qrdrop .
+          rm -rf lib && mv /tmp/qrdrop_lib lib
+          mv /tmp/qrdrop_pubspec.yaml pubspec.yaml
+      - run: flutter pub get
+      - run: flutter build linux --release
+      - name: Упаковка в tar.gz
+        run: |
+          cd build/linux/x64/release/bundle
+          tar -czf "$GITHUB_WORKSPACE/QRDrop-Linux-x64.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QRDrop-Linux-x64
+          path: QRDrop-Linux-x64.tar.gz
