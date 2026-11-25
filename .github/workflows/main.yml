@@ -18,8 +18,25 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Генерация Android-платформы и разрешений сети
+      - name: Подготовка проекта и Android-платформы
         run: |
+          python3 - << 'EOF'
+          import pathlib, shutil, zipfile
+          root = pathlib.Path(".")
+          if not (root / "pubspec.yaml").exists():
+              for z in root.glob("*.zip"):
+                  with zipfile.ZipFile(z) as zf:
+                      zf.extractall(root)
+          if not (root / "pubspec.yaml").exists():
+              found = next(root.rglob("pubspec.yaml"), None)
+              if not found:
+                  raise SystemExit("ОШИБКА: pubspec.yaml не найден! Загрузите qrdrop_flutter_project.zip на вкладку Code.")
+              src = found.parent
+              shutil.copy2(src / "pubspec.yaml", root / "pubspec.yaml")
+              if (root / "lib").exists():
+                  shutil.rmtree(root / "lib")
+              shutil.copytree(src / "lib", root / "lib")
+          EOF
           cp -r lib /tmp/qrdrop_lib
           cp pubspec.yaml /tmp/qrdrop_pubspec.yaml
           flutter create --platforms=android --project-name qrdrop --org com.qrdrop .
@@ -54,11 +71,21 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Генерация Windows-платформы
+      - name: Подготовка проекта и Windows-платформы
         shell: pwsh
         run: |
-          Copy-Item -Recurse lib $env:TEMP\qrdrop_lib
-          Copy-Item pubspec.yaml $env:TEMP\qrdrop_pubspec.yaml
+          if (-not (Test-Path pubspec.yaml)) {
+            $zip = Get-ChildItem -Filter *.zip | Select-Object -First 1
+            if ($zip) { Expand-Archive -Path $zip.FullName -DestinationPath . -Force }
+          }
+          if (-not (Test-Path pubspec.yaml)) {
+            $found = Get-ChildItem -Recurse -Filter pubspec.yaml | Select-Object -First 1
+            if (-not $found) { throw "ОШИБКА: pubspec.yaml не найден! Загрузите qrdrop_flutter_project.zip на вкладку Code." }
+            Copy-Item $found.FullName .\pubspec.yaml -Force
+            Copy-Item -Recurse (Join-Path $found.DirectoryName lib) .\lib -Force
+          }
+          Copy-Item -Recurse lib $env:TEMP\qrdrop_lib -Force
+          Copy-Item pubspec.yaml $env:TEMP\qrdrop_pubspec.yaml -Force
           flutter create --platforms=windows --project-name qrdrop --org com.qrdrop .
           Remove-Item -Recurse -Force lib
           Move-Item $env:TEMP\qrdrop_lib lib
@@ -81,8 +108,25 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Генерация macOS-платформы и прав сети/файлов
+      - name: Подготовка проекта и macOS-платформы
         run: |
+          python3 - << 'EOF'
+          import pathlib, shutil, zipfile
+          root = pathlib.Path(".")
+          if not (root / "pubspec.yaml").exists():
+              for z in root.glob("*.zip"):
+                  with zipfile.ZipFile(z) as zf:
+                      zf.extractall(root)
+          if not (root / "pubspec.yaml").exists():
+              found = next(root.rglob("pubspec.yaml"), None)
+              if not found:
+                  raise SystemExit("ОШИБКА: pubspec.yaml не найден! Загрузите qrdrop_flutter_project.zip на вкладку Code.")
+              src = found.parent
+              shutil.copy2(src / "pubspec.yaml", root / "pubspec.yaml")
+              if (root / "lib").exists():
+                  shutil.rmtree(root / "lib")
+              shutil.copytree(src / "lib", root / "lib")
+          EOF
           cp -r lib /tmp/qrdrop_lib
           cp pubspec.yaml /tmp/qrdrop_pubspec.yaml
           flutter create --platforms=macos --project-name qrdrop --org com.qrdrop .
@@ -125,8 +169,25 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Генерация Linux-платформы
+      - name: Подготовка проекта и Linux-платформы
         run: |
+          python3 - << 'EOF'
+          import pathlib, shutil, zipfile
+          root = pathlib.Path(".")
+          if not (root / "pubspec.yaml").exists():
+              for z in root.glob("*.zip"):
+                  with zipfile.ZipFile(z) as zf:
+                      zf.extractall(root)
+          if not (root / "pubspec.yaml").exists():
+              found = next(root.rglob("pubspec.yaml"), None)
+              if not found:
+                  raise SystemExit("ОШИБКА: pubspec.yaml не найден! Загрузите qrdrop_flutter_project.zip на вкладку Code.")
+              src = found.parent
+              shutil.copy2(src / "pubspec.yaml", root / "pubspec.yaml")
+              if (root / "lib").exists():
+                  shutil.rmtree(root / "lib")
+              shutil.copytree(src / "lib", root / "lib")
+          EOF
           cp -r lib /tmp/qrdrop_lib
           cp pubspec.yaml /tmp/qrdrop_pubspec.yaml
           flutter create --platforms=linux --project-name qrdrop --org com.qrdrop .
