@@ -466,7 +466,8 @@ class QrDropServer extends ChangeNotifier {
         final tmp = File('${target.path}.part');
         final sink = tmp.openWrite();
         try {
-          await req.pipe(sink);
+          await sink.addStream(req);
+          await sink.close();
           await tmp.rename(target.path);
           notifyListeners();
           await _sendJson(req, {'saved': sanitizeFilename(target.path)}, status: HttpStatus.created);
@@ -565,7 +566,7 @@ const String _loginHtml = '''<!doctype html>
 </body>
 </html>''';
 
-const String _webAppHtml = '''<!doctype html>
+const String _webAppHtml = r'''<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
